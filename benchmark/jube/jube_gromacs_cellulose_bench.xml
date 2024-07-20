@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jube>
+    <benchmark name="GROMACS" outpath="lignocellulose_run">
+        <comment>MD simulations of ligno cellulose from the PRACE benchmark suite with GROMACS.</comment>
+        <include from="jube_gromacs_common.xml" path="parameterset" />
+        <include from="jube_gromacs_common.xml" path="patternset" />
+
+        <fileset name="cellulose">
+            <copy>GROMACS_TestCaseB.tar.xz</copy>
+        </fileset>
+
+        <parameterset name="systemParameter" init_with="jube_gromacs_common.xml:systemdefaults">
+            <!-- <parameter name="nodes">12</parameter> -->
+            <parameter name="nodes">1</parameter>
+            <parameter name="timelimit">00:40:00</parameter>
+            <parameter tag="!system" name="executable">${profile} $jube_benchmark_home/gromacs/Stage$stage/$version/$compiler/bin/gmx_mpi</parameter>
+            <parameter tag="system" name="executable">gmx_mpi</parameter>
+            <parameter name="args_exec">mdrun -s lignocellulose-rf.tpr -maxh 0.50 -resethway -noconfout -nsteps 10000 -g logfile -ntomp $threadspertask -dlb auto</parameter>
+        </parameterset>
+
+        <include from="jube_gromacs_common.xml" path="step" />
+
+        <step name="cellulose" depend="environment">
+            <use>cellulose</use>
+            <use>versions</use>
+            <use from="platform.xml">executeset</use>
+            <use>systemParameter</use>
+            <use from="platform.xml">jobfiles</use>
+            <use from="platform.xml">executesub</use>
+            <do>tar axvf GROMACS_TestCaseB.tar.gz</do>
+            <do>$submit $submit_script</do>
+            <do done_file="$done_file"></do>
+        </step>
+
+        <analyser name="perf_analysis">
+            <use>performance</use>
+            <analyse step="cellulose">
+                <file>logfile.log</file>
+            </analyse>
+        </analyser>
+        <!-- Result table -->
+        <result>
+        <use>perf_analysis</use>
+        <table name="result_pretty" style="pretty" sort="tasks">
+            <column title="Nodes">nodes</column>
+            <column title="MPI tasks">tasks</column>
+            <column title="Threads per Task">threadspertask</column>
+            <column title="GPUs per Node">gpuspernode</column>
+            <column format=".3f" title="Performance [ns/d]">perf</column>
+            <column format=".3f" title="Wall t[s]">time</column>
+            <column format=".3f" title="MFLOPs">mflops</column>
+	    <column title="Version">version</column>
+            <column title="Compiler">compiler</column>
+        </table>
+        </result>
+    </benchmark>
+</jube>
+ 

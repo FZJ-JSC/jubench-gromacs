@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jube>
+    <benchmark name="GROMACS" outpath="ionchannel_run">
+        <comment>MD simulations of an ion channel from the PRACE benchmark suite with GROMACS.</comment>
+        <include from="jube_gromacs_common.xml" path="parameterset" />
+        <include from="jube_gromacs_common.xml" path="patternset" />
+
+        <fileset name="ion-channel">
+            <copy>GROMACS_TestCaseA.tar.xz</copy>
+        </fileset>
+        
+        <parameterset name="systemParameter" init_with="jube_gromacs_common.xml:systemdefaults">
+            <parameter name="nodes">3</parameter>
+            <!-- Overwriting values for taskspernode, tasks, and threadspertask. These are the values used for the baseline -->
+            <parameter name="taskspernode" type="int">8</parameter>
+            <parameter name="threadspertask" type="int">6</parameter>
+            <parameter name="tasks" type="int">22</parameter>
+
+            <parameter name="timelimit">00:35:00</parameter>
+            <parameter name="args_exec">mdrun -s GROMACS_TestCaseA/ion_channel.tpr -maxh 0.5 -resetstep 60000 -noconfout -nsteps 600000 -g logfile -ntomp $threadspertask -dlb auto -pme gpu -npme 1 -nstlist 100</parameter>
+            <parameter name="env">export GMX_ENABLE_DIRECT_GPU_COMM=ON;export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK;</parameter>
+        </parameterset>
+        
+        <include from="jube_gromacs_common.xml" path="step" />
+
+        <step name="benchmark" depend="environment">
+            <use>ion-channel</use>
+            <use>versions</use>
+            <use from="platform.xml">executeset</use>
+            <use>systemParameter</use>
+            <use from="platform.xml">jobfiles</use>
+            <use from="platform.xml">executesub</use>
+            <do>tar axvf GROMACS_TestCaseA.tar.xz</do>
+            <do>$submit --cuda-mps $submit_script</do>
+            <do done_file="$done_file"></do>
+        </step>
+
+        <include from="jube_gromacs_common.xml" path="analyser" />
+        <include from="jube_gromacs_common.xml" path="result" />
+    </benchmark>
+</jube>
+ 

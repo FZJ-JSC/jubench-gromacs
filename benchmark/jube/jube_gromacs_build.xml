@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jube>
+    <benchmark name="GROMACS_Build" outpath="gromacs_build">
+        <include from="jube_gromacs_common.xml" path="parameterset" />
+        <include from="jube_gromacs_common.xml" path="patternset" />
+        <fileset name="source">
+            <copy>gromacs-${version}.tar.gz</copy>
+            <copy>regressiontests-${version}.tar.gz</copy>
+        </fileset>
+        <include from="jube_gromacs_common.xml" path="step" />
+        
+        <step name="prepare">
+            <use>versions</use>
+            <do>test -f $jube_benchmark_home/gromacs-${version}.tar.gz ||curl -O ftp://ftp.gromacs.org/pub/gromacs/gromacs-${version}.tar.gz</do>
+            <do>test -f $jube_benchmark_home/regressiontests-${version}.tar.gz || curl -O ftp://ftp.gromacs.org/regressiontests/regressiontests-${version}.tar.gz</do>
+            <do>test -f $jube_benchmark_home/GROMACS_TestCaseA.tar.xz || curl -O https://repository.prace-ri.eu/ueabs/GROMACS/2.2/GROMACS_TestCaseA.tar.xz</do>
+            <do>test -f $jube_benchmark_home/GROMACS_TestCaseC.tar.xz || curl -O https://repository.prace-ri.eu/ueabs/GROMACS/2.2/GROMACS_TestCaseC.tar.xz</do>
+            <do>test -f $jube_benchmark_home/gromacs-${version}.tar.gz || cp gromacs-${version}.tar.gz $jube_benchmark_home</do>
+            <do>test -f $jube_benchmark_home/regressiontests-${version}.tar.gz || cp regressiontests-${version}.tar.gz $jube_benchmark_home</do>
+            <do>test -f $jube_benchmark_home/GROMACS_TestCaseA.tar.xz ||cp GROMACS_TestCaseA.tar.xz $jube_benchmark_home</do>
+            <do>test -f $jube_benchmark_home/GROMACS_TestCaseC.tar.xz || cp GROMACS_TestCaseC.tar.xz $jube_benchmark_home</do>
+        </step>
+
+        <step name="build" depend="environment, prepare">
+            <use>versions</use>
+            <use>source</use>
+            <do>tar zxvf gromacs-${version}.tar.gz</do>
+            <do>tar zxvf regressiontests-${version}.tar.gz</do>
+            <do>mkdir -p gromacs-Stage${stage}-${version}/build</do>
+            <do>cd gromacs-Stage${stage}-${version}/build; 
+                cmake ../../gromacs-${version}/ \
+                    -DCMAKE_C_COMPILER=${c_compiler} \
+                    -DCMAKE_CXX_COMPILER=${cpp_compiler} \
+                    -DGMX_FFT_LIBRARY=fftw3 \
+                    -DGMX_MPI=on \
+                    ${additional_compile_flags} \
+                    -DCMAKE_INSTALL_PREFIX=$jube_benchmark_home/gromacs/Stage${stage}/$version/$compiler \
+                    -DREGRESSIONTEST_PATH=../../regressiontests-${version} \
+                    -DMPIEXEC=srun -DMPIEXEC_NUMPROC_FLAG=-n \
+                    -DMPIEXEC_PREFLAGS='-p;develbooster;-A;jscbenchmark;--gres=gpu:4'
+                make -j 20;
+                make -j 20 install;
+            </do>
+        </step>
+    </benchmark>
+</jube>

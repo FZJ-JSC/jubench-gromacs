@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jube>
+    <parameterset name="versions">
+        <parameter name="stage">2024</parameter>
+        <parameter name="compiler">GCC</parameter>
+        <parameter name="build_type">gpu</parameter>
+        <parameter name="mpi" mode="python" separator=";">
+            {
+                "cpu": "ParaStationMPI",
+                "gpu": "ParaStationMPI",
+            }["${build_type}"]
+        </parameter>
+        <parameter name="gpu_modules" mode="python" separator=";">
+            {
+                "cpu": "",
+                "gpu": "CUDA MPI-settings/CUDA",
+            }["${build_type}"]
+        </parameter>
+        <parameter name="version">2023</parameter>
+        <parameter tag="!system" name="othermodules">CMake JUBE FFTW Python ${gpu_modules}</parameter>
+        <parameter tag="system" name="othermodules">CMake JUBE FFTW Python ${gpu_modules} GROMACS/${version} </parameter>
+        <parameter name="systemname" mode="shell">cat /etc/FZJ/systemname | tr -d "\n"</parameter>
+        <parameter name="c_compiler" mode="python" separator=";">
+            {
+            "GCC" : "gcc",
+            "Intel": "icc",
+            }["${compiler}"]
+        </parameter>
+        <parameter name="cpp_compiler" mode="python" separator=";">
+            {
+                "GCC" : "g++",
+                "Intel": "icpc",
+            }["${compiler}"]
+        </parameter>
+        <parameter name="additional_compile_flags" mode="python" separator=";">
+            {
+                "cpu": "",
+                "gpu": "-DGMX_GPU=CUDA"
+            }["${build_type}"]
+        </parameter>
+    </parameterset>
+
+    <parameterset name="systemdefaults" init_with="platform.xml:systemParameter">
+        <parameter name="queue" mode="python"  separator=";">
+            {
+                "cpu": {
+                        "juwels": "batch",
+                        "juwelsbooster": "batch",
+                        "jurecadc": "dc-cpu",
+                        "jusuf": "batch"
+                       },
+                "gpu": {
+                        "juwels": "develgpus",
+                        "juwelsbooster": "booster",
+                        "jurecadc": "dc-gpu",
+                        "jusuf": "gpus"
+                       }
+            }["${build_type}"]["${systemname}"]
+        </parameter>
+        <parameter name="account">jscbenchmark</parameter>
+        <parameter name="taskspernode" type="int" mode="python" separator=";">
+            {
+                "juwels": "8" if "${build_type}" is "cpu" else "4",
+                "juwelsbooster": "4" if "${build_type}" is "cpu" else "4;8",
+                "jurecadc": "8;16" if "${build_type}" is "cpu" else "4;8",
+                "jusuf": "8;16" if "${build_type}" is "cpu" else "4;8",
+            }["${systemname}"]
+        </parameter>
+        <parameter name="gpuspernode" mode="python" type="int" default="4">
+            "1,2,4" if "$nodes" == "1" else "4"
+        </parameter>
+        <parameter name="gres" mode="python" separator=";">
+            {
+                "cpu": "NONE",
+                "gpu": "gpu:${gpuspernode}"
+            }["${build_type}"]
+        </parameter>
+        <parameter name="threadspertask" type="int" mode="python" separator=";">
+            {
+                "cpu": "6;12" if "juwels" in "${systemname}" else "8;16",
+                "gpu": "6;12" if "juwels" in "${systemname}" else "8;16",
+            }["${build_type}"]
+        </parameter>
+        <parameter name="profile" tag="profile">nvprof --export-profile profile-%h_%q{PMI_RANK}.nvprof</parameter>
+        <parameter name="profile" tag="!profile"></parameter>
+        <parameter tag="!system" name="executable">${profile} $jube_benchmark_home/gromacs/Stage$stage/$version/$compiler/bin/gmx_mpi</parameter>
+        <parameter tag="system" name="executable">${profile}gmx_mpi</parameter>
+        <parameter name="preprocess">module load ${compiler} ${mpi} ${othermodules}</parameter>
+    </parameterset>
+
+    <patternset name="performance">
+        <pattern name="perf" type="float">Performance:\s+$jube_pat_fp</pattern>
+        <pattern name="time" type="float">Time:\s+\d+\.\d+\s+$jube_pat_fp</pattern>
+        <pattern name="mflops" type="float">\sTotal\s+$jube_pat_fp</pattern>
+    </patternset>
+
+    <!-- Here we set up our environment including compilers and libraries -->
+    <step name="environment" export="true">
+        <use>versions</use>
+        <do>module purge</do>
+        <do>module load Stages/${stage}</do>
+        <do>module load ${compiler} ${mpi} ${othermodules}</do>
+        <do tag="system">module load GROMACS/$version</do>
+        <do>export GMX_ENABLE_DIRECT_GPU_COMM=ON</do>
+    </step>
+
+    <analyser name="perf_analysis">
+    <use>performance</use>
+        <analyse step="benchmark">
+            <file>logfile.log</file>
+        </analyse>
+    </analyser>
+    <!-- Result table -->
+    <result>
+    <use>perf_analysis</use>
+    <table name="result" style="pretty" sort="">
+        <column title="Nodes">nodes</column>
+        <column title="MPI tasks">tasks</column>
+        <column title="Threads per Task">threadspertask</column>
+        <column title="GPUs per Node">gpuspernode</column>
+        <column format=".3f" title="Performance [ns/d]">perf</column>
+        <column format=".3f" title="Wall t[s]">time</column>
+        <column format=".3f" title="MFLOPs">mflops</column>
+    <column title="Version">version</column>
+        <column title="Compiler">compiler</column>
+    </table>
+    </result>
+</jube>
+
