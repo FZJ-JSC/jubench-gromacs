@@ -57,7 +57,7 @@
                        }
             }["${build_type}"]["${systemname}"]
         </parameter>
-        <parameter name="account">exalab</parameter>
+        <parameter name="account">jscbenchmark</parameter>
         <parameter name="taskspernode" type="int" mode="python" separator=";">
             {
                 "juwels": "8" if "${build_type}" is "cpu" else "4",
