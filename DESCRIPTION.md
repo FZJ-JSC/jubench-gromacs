@@ -32,7 +32,7 @@ You can also use JUBE to download and build GROMACS: `jube run benchmark/jube/ju
 
 If you use JUBE, you need to adjust the CMake and module parameters in `jube_gromacs_build.xml` for your platform.
 
-You may choose optimized FFT and BLAS libraries in accordance with the general rules for the exchange and usage of libraries. In particular the STMV benchmark requires a build with multi-GPU PME to scale (c.f. [Using CuFFTMp](https://manual.gromacs.org/current/install-guide/index.html#using-cufftmp) in the GROMACS manual.)
+You may choose optimized FFT and BLAS libraries in accordance with the general rules for the exchange and usage of libraries. In particular the STMV benchmark requires a build with multi-GPU PME to scale (c.f. [Using CuFFTMp](https://manual.gromacs.org/current/install-guide/index.html#using-cufftmp) in the GROMACS manual, or sketched quickly below.)
 
 ### Modifications
 
@@ -40,6 +40,20 @@ GROMACS supports a wide range of architectures and changes to the source code sh
 exploits the architecture, the patch must be submitted with the results and be placed under an LGPL v. 2.1 license so it can be included in future versions of GROMACS.
 
 You may also use a later released version of GROMACS.
+
+### Example Compilation with Distributed FFT
+
+As GROMACS is a widely used application, many compile optimization are available. As an example, instructions are sketched here for using a distributed FFT library, cuFFTmp, for the STMV sub-benchmark. As this is a highly platform-specific optimization, it is not included automatically in the JUBE script, but hints are given at the according places in the JUBE file.
+
+Taking JUWELS Booster as an example, cuFFTmp needs to be available in the environment and enabled through the proper compiler switches.
+
+```bash
+ml NVHPC OpenMPI NCCL CMake Python-bundle-PyPI
+export LD_LIBRARY_PATH=$EBROOTNVHPC/Linux_x86_64/2023/comm_libs/12.2/nvshmem_cufftmp_compat/lib:$EBROOTNVHPC/Linux_x86_64/2023/math_libs/12.2/lib64:$LD_LIBRARY_PATH
+cmake ../ -DGMX_OPENMP=ON -DGMX_MPI=ON -DGMX_BUILD_OWN_FFTW=ON -DGMX_GPU=CUDA  -DGMX_CUDA_TARGET_SM=80 -DCMAKE_BUILD_TYPE=Release -DGMX_DOUBLE=off -DGMX_USE_CUFFTMP=ON -DcuFFTMp_ROOT=$EBROOTNVHPC/Linux_x86_64/2023/math_libs/12.2
+```
+
+(The environment variables `$EBROOTNVHPC` are set through the `NVHPC` environment module and point to the NVIDIA HPC SDK.)
 
 
 ## Execution
@@ -93,6 +107,19 @@ mpiexec -n 22 gmx_mpi mdrun -s ion_channel.tpr -maxh 0.50 -resetstep 60000 -noco
 
 ```bash
 mpiexec -n 8 gmx_mpi mdrun -s stmv.28M.tpr -maxh 2.90 -resetstep 10000 -noconfout -nsteps 170000 -g logfile -ntomp $threadspertask -tunepme no -pme gpu -npme 1 -bonded gpu -nstlist 400
+```
+
+##### Example Execution with Distributed FFT Library
+
+Picking up the previous example of using cuFFTmp as a highly-optimized library with platform-specific tuning, an example execution of the case looks like the following on JUWELS Booster:
+
+```bash
+ml NVHPC OpenMPI NCCL CMake Python-bundle-PyPI
+export LD_LIBRARY_PATH=$EBROOTNVHPC/Linux_x86_64/2023/comm_libs/12.2/nvshmem_cufftmp_compat/lib:$EBROOTNVHPC/Linux_x86_64/2023/math_libs/12.2/lib64:$LD_LIBRARY_PATH
+export GMX_ENABLE_DIRECT_GPU_COMM=ON
+export GMX_GPU_PME_DECOMPOSITION=1
+
+srun -N 128 -n 512 -c 6 --time 00:30:00 --gres=gpu:4 --threads-per-core=2 gromacs/build/bin/gmx_mpi mdrun -s GROMACS_TestCaseC/stmv.28M.tpr -maxh 0.5 -resetstep 10000 -noconfout -nsteps 170000 -g logfile -ntomp 6 -tunepme no -pme gpu -npme 128 -bonded gpu -nstlist 400 -cpt -1 -pin on 
 ```
 
 #### JUBE
